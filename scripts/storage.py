@@ -30,16 +30,24 @@ class Scripts(scripts.Script):
         return scripts.AlwaysVisible
 
     def postprocess(self, p, processed):
-        is_save = shared.opts.data.get("db_strage_is_save_db")
-        collection = get_collection() if is_save else None
+        collection = get_collection() if shared.opts.data.get("db_strage_is_save_db") else None
         if collection is None:
             return True
         
-        for i in range(len(processed.images)):
-            info = re.findall(r"Steps:.*$", processed.info, re.M)[0]
-            input_dict = dict(item.split(": ") for item in str(info).split(", "))
+        info = re.findall(r"Steps:.*$", processed.info, re.M)[0]
+        input_dict = dict(item.split(": ") for item in str(info).split(", "))
 
-            image = processed.images[i]
+        if 'Face restoration' not in input_dict:
+            input_dict["Face restoration"] = ''
+        
+        # When disable Hires. fix
+        if 'Denoising strength' not in input_dict:
+            input_dict["Denoising strength"] = 0
+            input_dict["Hires upscale"] = 0
+            input_dict["Hires steps"] = 0
+            input_dict["Hires upscaler"] = ''
+
+        for image in processed.images:
             buffer = BytesIO()
             image.save(buffer, "png")
             image_bytes = buffer.getvalue()
@@ -50,6 +58,7 @@ class Scripts(scripts.Script):
                 "steps": int(input_dict["Steps"]), 
                 "seed": int(processed.seed), 
                 "sampler": input_dict["Sampler"],
+                "Face restoration": input_dict["Face restoration"],
                 "Denoising strength": float(input_dict["Denoising strength"]),
                 "Hires upscale": int(input_dict["Hires upscale"]),
                 "Hires steps": int(input_dict["Hires steps"]),
@@ -61,6 +70,7 @@ class Scripts(scripts.Script):
                 "rate": 0,
                 "image": image_bytes
             })
+
         return True
 
 def on_ui_settings():
